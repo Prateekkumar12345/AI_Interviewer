@@ -1,0 +1,336 @@
+{
+  "Prateek": [
+    {
+      "overall_summary": "The candidate demonstrated strong technical skills in AI and security, with a clear focus on privacy and data protection. Communication was effective in conveying complex technical concepts. Problem-solving abilities were evident in designing robust AI systems. The candidate's cultural fit was aligned with a security-conscious and privacy-oriented work environment. The depth of experience in AI engineering was substantial.",
+      "scores": {
+        "technical_skills": {
+          "score": 9,
+          "strengths": [
+            "Machine learning",
+            "Data privacy"
+          ],
+          "weaknesses": [
+            "None"
+          ],
+          "details": "The candidate showcased advanced technical skills in AI, particularly in machine learning and data privacy aspects. Their approach to implementing privacy measures in AI systems was comprehensive and well thought out."
+        },
+        "communication": {
+          "score": 8,
+          "strengths": [
+            "Clear explanation",
+            "Effective articulation"
+          ],
+          "weaknesses": [
+            "None"
+          ],
+          "details": "Communication was a strength for the candidate, as they effectively explained complex technical concepts related to AI and security. Their ability to convey ideas clearly was notable."
+        },
+        "problem_solving": {
+          "score": 8,
+          "strengths": [
+            "System design",
+            "Risk mitigation"
+          ],
+          "weaknesses": [
+            "None"
+          ],
+          "details": "The candidate demonstrated strong problem-solving skills, especially in designing AI systems with a focus on security and privacy. Their approach to risk mitigation in handling user data was commendable."
+        },
+        "cultural_fit": {
+          "score": 8,
+          "strengths": [
+            "Privacy-focused mindset",
+            "Adherence to best practices"
+          ],
+          "weaknesses": [
+            "None"
+          ],
+          "details": "The candidate's cultural fit was strong, aligning well with a security-conscious and privacy-oriented work environment. Their commitment to following best practices in data protection was evident."
+        },
+        "experience_depth": {
+          "score": 9,
+          "strengths": [
+            "Extensive AI engineering experience",
+            "Hands-on project implementation"
+          ],
+          "weaknesses": [
+            "None"
+          ],
+          "details": "The candidate showcased deep experience in AI engineering, with a focus on practical project implementation. Their hands-on approach to building AI systems was impressive."
+        },
+        "behavioral_responses": {
+          "score": 7,
+          "strengths": [
+            "Focused responses",
+            "Confidence in technical knowledge"
+          ],
+          "weaknesses": [
+            "Desire for feedback"
+          ],
+          "details": "The candidate provided focused responses during the interview, demonstrating confidence in their technical knowledge. However, there was a repeated request for feedback, indicating a strong desire for immediate input."
+        }
+      },
+      "overall_score": 8,
+      "recommendation": "hire",
+      "key_highlights": [
+        "Strong technical skills in AI and security",
+        "Effective communication of complex concepts",
+        "Privacy-focused mindset and cultural fit"
+      ],
+      "improvement_areas": [
+        "Handling feedback requests more constructively",
+        "Further enhancing real-time alerting mechanisms in security systems"
+      ],
+      "actionable_recommendations": [
+        "Continue to stay updated on the latest trends in AI and security",
+        "Further develop skills in real-time security incident response",
+        "Practice responding to feedback in a more structured manner"
+      ],
+      "date": "2026-02-09 12:11:21",
+      "job_role": "AI Engineer",
+      "company": "General Interview"
+    },
+    {
+      "overall_summary": "The candidate demonstrated a lack of technical skills, communication abilities, and problem-solving capabilities during the interview. Their reluctance to engage in the conversation and lack of relevant experience were evident throughout.",
+      "scores": {
+        "technical_skills": {
+          "score": 1,
+          "strengths": [],
+          "weaknesses": [
+            "Lack of technical skills and experience"
+          ],
+          "details": "The candidate admitted to having no projects, courses, or self-study in AI or machine learning. This lack of foundational knowledge and practical experience severely hinders their technical skills in this field."
+        },
+        "communication": {
+          "score": 2,
+          "strengths": [],
+          "weaknesses": [
+            "Poor engagement, lack of clarity in responses"
+          ],
+          "details": "The candidate's responses were brief, lacked detail, and showed a clear disinterest in the conversation. Their communication style did not effectively convey their thoughts or engage with the interviewer."
+        },
+        "problem_solving": {
+          "score": 1,
+          "strengths": [],
+          "weaknesses": [
+            "Inability to tackle questions, lack of critical thinking"
+          ],
+          "details": "The candidate's reluctance to answer questions and inability to provide any insights or solutions showcased a lack of problem-solving skills and critical thinking abilities."
+        },
+        "cultural_fit": {
+          "score": 2,
+          "strengths": [],
+          "weaknesses": [
+            "Lack of enthusiasm, poor attitude"
+          ],
+          "details": "The candidate's disinterest in the interview process, reluctance to engage, and negative attitude may not align well with the collaborative and innovative culture typically sought in AI engineering roles."
+        },
+        "experience_depth": {
+          "score": 1,
+          "strengths": [],
+          "weaknesses": [
+            "No relevant experience in AI or machine learning"
+          ],
+          "details": "The candidate's lack of experience in AI projects, technical skills, or exposure to AI technologies indicates a shallow understanding of the field and an inability to contribute meaningfully to AI engineering roles."
+        },
+        "behavioral_responses": {
+          "score": 1,
+          "strengths": [],
+          "weaknesses": [
+            "Unwillingness to engage, lack of professionalism"
+          ],
+          "details": "The candidate's repeated requests to end the interview, refusal to answer questions, and overall uncooperative behavior demonstrate a lack of professionalism and readiness for a career in AI engineering."
+        }
+      },
+      "overall_score": 1,
+      "recommendation": "no_hire",
+      "key_highlights": [
+        "Lack of technical skills and experience",
+        "Poor engagement and communication",
+        "Inability to tackle questions or demonstrate problem-solving skills"
+      ],
+      "improvement_areas": [
+        "Technical skills development",
+        "Communication skills enhancement",
+        "Attitude and engagement improvement"
+      ],
+      "actionable_recommendations": [
+        "Focus on gaining practical experience through projects or courses in AI and machine learning",
+        "Work on improving communication skills through practice and active listening",
+        "Address negative attitude and lack of enthusiasm through self-reflection and professional development"
+      ],
+      "date": "2026-02-11 17:13:40",
+      "job_role": " AI Engineer",
+      "company": "General Interview"
+    },
+    {
+      "overall_summary": "The candidate demonstrated strong technical skills and problem-solving abilities, but there were some communication and behavioral response weaknesses noted during the interview.",
+      "scores": {
+        "technical_skills": {
+          "score": 8,
+          "strengths": [
+            "AI application development",
+            "asynchronous programming"
+          ],
+          "weaknesses": [
+            "PDF parsing optimization"
+          ],
+          "details": "The candidate showcased expertise in building AI applications and effectively addressed performance issues by offloading blocking operations. However, there was room for improvement in optimizing PDF parsing for better efficiency."
+        },
+        "communication": {
+          "score": 6,
+          "strengths": [
+            "clear explanations",
+            "technical terminology usage"
+          ],
+          "weaknesses": [
+            "engagement in conversation",
+            "elaborating on specific examples"
+          ],
+          "details": "The candidate effectively communicated technical concepts but lacked engagement in the conversation and could have provided more detailed examples to showcase their experience."
+        },
+        "problem_solving": {
+          "score": 9,
+          "strengths": [
+            "identifying performance bottlenecks",
+            "implementing effective solutions"
+          ],
+          "weaknesses": [
+            "communicating optimization steps"
+          ],
+          "details": "The candidate excelled in identifying and resolving performance bottlenecks efficiently. However, there was a slight gap in effectively communicating the optimization steps taken."
+        },
+        "cultural_fit": {
+          "score": 7,
+          "strengths": [
+            "technical expertise alignment",
+            "project experience relevance"
+          ],
+          "weaknesses": [
+            "engagement in non-technical discussions",
+            "team collaboration examples"
+          ],
+          "details": "The candidate's technical expertise aligned well with the role, but there were opportunities for improvement in engaging in non-technical discussions and providing more team collaboration examples."
+        },
+        "experience_depth": {
+          "score": 8,
+          "strengths": [
+            "hands-on AI project experience",
+            "production-ready application development"
+          ],
+          "weaknesses": [
+            "specific project challenges discussion",
+            "deep dive into technical implementations"
+          ],
+          "details": "The candidate demonstrated solid hands-on experience in AI project development and building production-ready applications. However, there could have been more in-depth discussions on specific project challenges and technical implementations."
+        },
+        "behavioral_responses": {
+          "score": 5,
+          "strengths": [
+            "initial self-introduction",
+            "project experience overview"
+          ],
+          "weaknesses": [
+            "request for feedback",
+            "ending the interview abruptly"
+          ],
+          "details": "The candidate started well with a clear self-introduction and project overview but lacked in seeking feedback and abruptly ending the interview without elaborating on further questions."
+        }
+      },
+      "overall_score": 7,
+      "recommendation": "hire",
+      "key_highlights": [
+        "Strong technical skills",
+        "Effective problem-solving abilities",
+        "Solid project experience"
+      ],
+      "improvement_areas": [
+        "Enhance communication engagement",
+        "Provide more detailed examples",
+        "Work on ending conversations professionally"
+      ],
+      "actionable_recommendations": [
+        "Engage more in non-technical discussions to showcase cultural fit",
+        "Practice elaborating on specific project challenges and technical implementations",
+        "Work on wrapping up interviews with a professional conclusion"
+      ],
+      "date": "2026-02-27 20:38:22",
+      "job_role": "AI Engineer",
+      "company": "General Interview"
+    },
+    {
+      "overall_summary": "The candidate demonstrated strong technical skills in AI engineering, particularly in handling challenges with data extraction and validation. Communication was clear and concise. Problem-solving abilities were evident in overcoming issues with JSON output. The candidate's cultural fit and depth of experience were also notable.",
+      "scores": {
+        "technical_skills": {
+          "score": 9,
+          "strengths": [
+            "Data extraction",
+            "JSON validation"
+          ],
+          "weaknesses": [],
+          "details": "The candidate showcased advanced technical skills in AI engineering, especially in addressing challenges related to data extraction and validation. Their ability to implement robust solutions for consistent JSON output was commendable."
+        },
+        "communication": {
+          "score": 8,
+          "strengths": [
+            "Clarity",
+            "Conciseness"
+          ],
+          "weaknesses": [],
+          "details": "The candidate effectively communicated their project experiences and solutions with clarity and conciseness, making complex technical concepts easy to understand."
+        },
+        "problem_solving": {
+          "score": 9,
+          "strengths": [
+            "Adaptability",
+            "Resourcefulness"
+          ],
+          "weaknesses": [],
+          "details": "The candidate demonstrated strong problem-solving skills by adapting their approach to handle challenges with JSON output from the LLM API effectively. Their resourcefulness in finding solutions was impressive."
+        },
+        "cultural_fit": {
+          "score": 8,
+          "strengths": [
+            "Collaboration",
+            "Adaptability"
+          ],
+          "weaknesses": [],
+          "details": "The candidate's collaborative attitude and adaptability to changing project requirements align well with our team culture, showcasing good cultural fit."
+        },
+        "experience_depth": {
+          "score": 8,
+          "strengths": [
+            "Hands-on experience",
+            "Production-ready applications"
+          ],
+          "weaknesses": [],
+          "details": "The candidate's hands-on experience in building production-ready AI applications adds depth to their profile, demonstrating practical knowledge and skills in AI engineering."
+        },
+        "behavioral_responses": {
+          "score": 8,
+          "strengths": [
+            "Professionalism",
+            "Confidence"
+          ],
+          "weaknesses": [],
+          "details": "The candidate's professional demeanor and confident responses during the interview reflected a strong understanding of their projects and technical expertise."
+        }
+      },
+      "overall_score": 8.33,
+      "recommendation": "hire",
+      "key_highlights": [
+        "Strong technical skills in AI engineering",
+        "Effective problem-solving abilities",
+        "Clear communication"
+      ],
+      "improvement_areas": [],
+      "actionable_recommendations": [
+        "Continue to stay updated on the latest AI technologies and trends",
+        "Explore opportunities to lead AI projects for further growth"
+      ],
+      "date": "2026-02-27 20:56:06",
+      "job_role": "AI Engineer",
+      "company": "General Interview"
+    }
+  ]
+}

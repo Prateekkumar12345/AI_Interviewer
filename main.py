@@ -2,9 +2,10 @@ import streamlit as st
 from openai import OpenAI
 import json
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 import os
 from dotenv import load_dotenv
+import plotly.graph_objects as go
 
 # Load environment variables
 load_dotenv()
@@ -148,6 +149,89 @@ Common Question Types:
 
 
 # ============================
+#  Interview History Manager
+# ============================
+
+class InterviewHistoryManager:
+    """Manage interview history and scoring"""
+    
+    def __init__(self, storage_file="interview_history.json"):
+        self.storage_file = storage_file
+        self.history = self._load_history()
+    
+    def _load_history(self) -> Dict:
+        """Load interview history from file"""
+        try:
+            if os.path.exists(self.storage_file):
+                with open(self.storage_file, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading history: {e}")
+        return {}
+    
+    def _save_history(self):
+        """Save interview history to file"""
+        try:
+            with open(self.storage_file, 'w') as f:
+                json.dump(self.history, f, indent=2)
+        except Exception as e:
+            print(f"Error saving history: {e}")
+    
+    def save_interview(self, candidate_id: str, interview_data: Dict):
+        """Save interview data for a candidate"""
+        if candidate_id not in self.history:
+            self.history[candidate_id] = []
+        
+        self.history[candidate_id].append(interview_data)
+        self._save_history()
+    
+    def get_candidate_history(self, candidate_id: str) -> List[Dict]:
+        """Get all interviews for a candidate"""
+        return self.history.get(candidate_id, [])
+    
+    def get_latest_interview(self, candidate_id: str) -> Optional[Dict]:
+        """Get the most recent interview for a candidate"""
+        interviews = self.get_candidate_history(candidate_id)
+        return interviews[-1] if interviews else None
+    
+    def compare_interviews(self, candidate_id: str) -> Optional[Dict]:
+        """Compare latest interview with previous one"""
+        interviews = self.get_candidate_history(candidate_id)
+        if len(interviews) < 2:
+            return None
+        
+        current = interviews[-1]
+        previous = interviews[-2]
+        
+        comparison = {
+            "current_date": current["date"],
+            "previous_date": previous["date"],
+            "improvements": {},
+            "declines": {}
+        }
+        
+        for category in current["scores"]:
+            current_score = current["scores"][category]["score"]
+            previous_score = previous["scores"][category]["score"]
+            diff = current_score - previous_score
+            
+            if diff > 0:
+                comparison["improvements"][category] = {
+                    "current": current_score,
+                    "previous": previous_score,
+                    "change": diff
+                }
+            elif diff < 0:
+                comparison["declines"][category] = {
+                    "current": current_score,
+                    "previous": previous_score,
+                    "change": diff
+                }
+        
+        return comparison
+
+
+# ============================
 #  AI Interviewer with RAG
 # ============================
 
@@ -159,6 +243,7 @@ class RAGInterviewer:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         self.client = OpenAI(api_key=api_key)
         self.knowledge_base = CompanyKnowledgeBase()
+        self.history_manager = InterviewHistoryManager()
         
     def initialize_interview(self, job_role: str, difficulty: str, company: str = None) -> str:
         """Initialize interview with RAG context"""
@@ -168,73 +253,125 @@ class RAGInterviewer:
         if company and company != "General Interview":
             company_context = self.knowledge_base.get_company_context(company)
         
-        system_prompt = f"""
-You are a professional AI interviewer conducting a {difficulty.lower()} level interview for a {job_role} position.
+        system_prompt = f"""You are a professional AI interviewer conducting a {difficulty.lower()} level interview for a {job_role} position.
 {f'This interview is specifically for {company}.' if company and company != "General Interview" else 'This is a general technical interview.'}
 
 {company_context}
 
 INTERVIEW GUIDELINES:
-1. Start with a warm, professional welcome
-2. Ask the candidate to introduce themselves and discuss their background
-3. After introduction, ask relevant questions based on:
+1. Start with a warm, professional welcome. Ask the candidate how they're doing today to make them comfortable.
+2. After the initial pleasantries, ask them to introduce themselves and discuss their background in detail. Make this interactive - ask follow-up questions about their experience.
+3. Based on their introduction, ask relevant questions about:
    - The job role ({job_role})
    - The difficulty level ({difficulty})
    {f'- {company} specific focus areas and culture' if company and company != "General Interview" else '- General industry best practices'}
 4. Mix technical questions with behavioral questions
-5. Ask follow-up questions based on candidate responses
-6. Keep questions clear and focused
-7. After 8-12 quality questions, wrap up professionally
-8. Maintain a conversational, professional tone
+5. Ask thoughtful follow-up questions based on candidate responses
+6. Keep the conversation flowing naturally like a real interview
+7. After 8-12 quality questions, offer the candidate the opportunity to ask you questions (as most real interviews do)
+8. Wrap up professionally when appropriate
+
+CRITICAL RULES:
+- You must ONLY generate the interviewer's questions/statements
+- NEVER generate, predict, or include the candidate's responses
+- NEVER write "candidate:" or include what the candidate might say
+- Stop immediately after your question or statement
+- Wait for the actual candidate to respond
+- If the candidate explicitly says they want to end the interview (e.g., "I'd like to end the interview", "can we stop here", "I'm done", etc.), you should politely acknowledge and conclude the interview
 
 Remember: You're assessing both technical skills and cultural fit{f' for {company}' if company and company != "General Interview" else ''}.
 """
 
-        return self._generate_response(
-            system_prompt,
-            "Start the interview with a professional welcome and ask the candidate to introduce themselves."
-        )
+        user_prompt = """Start the interview with a warm, professional welcome. First greet the candidate and ask how they're doing today. After they respond, ask them to introduce themselves and tell you about their background. Make this an interactive conversation - if they give a brief introduction, ask a follow-up question to learn more.
+
+ONLY provide YOUR welcome message and initial interactive questions, nothing else."""
+        
+        return self._generate_response(system_prompt, user_prompt)
     
     def generate_next_question(self, conversation_history: List[Dict], job_role: str, 
                               difficulty: str, company: str = None) -> str:
         """Generate next question using conversation context"""
         
+        # Extract only the last few exchanges to prevent context overflow
         history_text = "\n".join([f"{msg['role']}: {msg['content']}" 
-                                 for msg in conversation_history[-10:]])
+                                 for msg in conversation_history[-8:]])
         questions_asked = len([msg for msg in conversation_history 
                               if msg["role"] == "interviewer"])
+        
+        # Check if user wants to end the interview
+        last_user_message = ""
+        for msg in reversed(conversation_history):
+            if msg["role"] == "candidate":
+                last_user_message = msg["content"].lower()
+                break
+        
+        # Keywords that indicate user wants to end the interview
+        end_interview_keywords = [
+            "end the interview", "stop the interview", "i'm done", "that's all",
+            "finish the interview", "conclude the interview", "wrap up", "i'd like to end",
+            "can we stop", "let's end", "i want to stop", "that's it for me",
+            "i'm finished", "i have nothing more", "end this", "stop now"
+        ]
+        
+        # If user wants to end, generate conclusion
+        if any(keyword in last_user_message for keyword in end_interview_keywords):
+            system_prompt = f"""You are concluding an interview for {job_role} ({difficulty} level){f' at {company}' if company and company != "General Interview" else ''}.
+
+The candidate has indicated they want to end the interview. Your task is to:
+1. Politely acknowledge their request
+2. Thank them for their time and participation
+3. Ask if they have any final questions for you (as is customary in real interviews)
+4. Provide a warm, professional conclusion
+
+Keep your response brief, professional, and positive."""
+            
+            return self._generate_response(
+                system_prompt,
+                "Generate a polite conclusion to the interview."
+            )
         
         company_context = ""
         if company and company != "General Interview":
             company_context = self.knowledge_base.get_company_context(company)
         
-        system_prompt = f"""
-You are conducting an interview for {job_role} ({difficulty} level){f' at {company}' if company and company != "General Interview" else ''}.
+        system_prompt = f"""You are conducting an interview for {job_role} ({difficulty} level){f' at {company}' if company and company != "General Interview" else ''}.
 
 {company_context}
 
-Conversation so far:
+Recent conversation:
 {history_text}
 
-Questions asked: {questions_asked}
+Questions asked so far: {questions_asked}
 
 Your task:
-- Continue the conversation naturally based on the candidate's last response
-- Ask thoughtful follow-up questions or move to new relevant topics
+- Based on the candidate's LAST response, generate your NEXT question or comment
+- Make it conversational and interactive - ask follow-up questions based on what they just said
 - Balance technical and behavioral questions
 {f'- Align questions with {company} culture and values' if company and company != "General Interview" else '- Focus on industry-standard competencies'}
-- After 8-12 substantial questions, wrap up the interview
-- Keep the conversation flowing like a real human interviewer
+- After 8-12 substantial questions, offer the candidate a chance to ask you questions
+- Keep the conversation flowing naturally like a real interview
+
+IMPORTANT:
+- If the candidate seems nervous or gives brief answers, ask encouraging follow-up questions
+- If they're doing well, gradually increase the difficulty
+- If this seems like a good point to let them ask questions, offer that opportunity
+- If they've answered 8+ questions, consider wrapping up
+
+CRITICAL RULES:
+- ONLY generate the interviewer's response (your response)
+- NEVER include "candidate:" or predict what the candidate will say
+- NEVER generate the candidate's answer
+- Stop immediately after your question/statement
+- Your response should be a single question or brief comment followed by a question
 """
 
-        return self._generate_response(
-            system_prompt,
-            "Provide the next natural interview question or closing remarks."
-        )
+        user_prompt = """Generate ONLY the interviewer's next question or statement. Make it interactive and based on what the candidate just said. Do not include any candidate responses."""
+        
+        return self._generate_response(system_prompt, user_prompt)
     
-    def generate_feedback(self, conversation_history: List[Dict], job_role: str, 
-                         company: str = None) -> str:
-        """Generate comprehensive feedback"""
+    def generate_detailed_feedback(self, conversation_history: List[Dict], job_role: str, 
+                                   company: str = None, candidate_id: str = None) -> Dict:
+        """Generate comprehensive feedback with detailed scoring"""
         
         history_text = "\n".join([f"{msg['role']}: {msg['content']}" 
                                  for msg in conversation_history])
@@ -243,39 +380,116 @@ Your task:
         if company and company != "General Interview":
             company_context = f"\nThis was an interview for {company}. Evaluate cultural fit based on {company}'s values and culture."
         
-        system_prompt = f"""
-You are an experienced hiring manager reviewing an interview for a {job_role} position.
+        system_prompt = f"""You are an experienced hiring manager reviewing an interview for a {job_role} position.
 {company_context}
-
-Provide detailed, constructive feedback covering:
-
-1. **Overall Assessment** - Summary of performance
-2. **Key Strengths** - What the candidate did well
-3. **Technical Skills** - Evaluation of technical knowledge
-4. **Communication Skills** - How well they articulated responses
-5. **Areas for Improvement** - Specific growth areas
-6. **Recommendations** - Actionable next steps
-{f'7. **Cultural Fit for {company}** - Alignment with company values' if company and company != "General Interview" else ''}
-
-Be specific, professional, and actionable.
 
 Interview Conversation:
 {history_text}
-"""
+
+Provide a detailed evaluation in the following JSON format:
+
+{{
+  "overall_summary": "Brief 2-3 sentence overview of the candidate's performance",
+  "scores": {{
+    "technical_skills": {{
+      "score": 0-10,
+      "strengths": ["strength1", "strength2"],
+      "weaknesses": ["weakness1", "weakness2"],
+      "details": "Detailed explanation"
+    }},
+    "communication": {{
+      "score": 0-10,
+      "strengths": ["strength1", "strength2"],
+      "weaknesses": ["weakness1", "weakness2"],
+      "details": "Detailed explanation"
+    }},
+    "problem_solving": {{
+      "score": 0-10,
+      "strengths": ["strength1", "strength2"],
+      "weaknesses": ["weakness1", "weakness2"],
+      "details": "Detailed explanation"
+    }},
+    "cultural_fit": {{
+      "score": 0-10,
+      "strengths": ["strength1", "strength2"],
+      "weaknesses": ["weakness1", "weakness2"],
+      "details": "Detailed explanation"
+    }},
+    "experience_depth": {{
+      "score": 0-10,
+      "strengths": ["strength1", "strength2"],
+      "weaknesses": ["weakness1", "weakness2"],
+      "details": "Detailed explanation"
+    }},
+    "behavioral_responses": {{
+      "score": 0-10,
+      "strengths": ["strength1", "strength2"],
+      "weaknesses": ["weakness1", "weakness2"],
+      "details": "Detailed explanation"
+    }}
+  }},
+  "overall_score": 0-10,
+  "recommendation": "hire/maybe/no_hire",
+  "key_highlights": ["highlight1", "highlight2", "highlight3"],
+  "improvement_areas": ["area1", "area2", "area3"],
+  "actionable_recommendations": ["recommendation1", "recommendation2", "recommendation3"]
+}}
+
+Rate each category from 0-10:
+- 0-3: Poor (needs significant improvement)
+- 4-5: Below average (needs improvement)
+- 6-7: Average (meets basic expectations)
+- 8-9: Good (exceeds expectations)
+- 10: Excellent (exceptional performance)
+
+Be specific, objective, and constructive in your evaluation."""
 
         try:
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": "Provide comprehensive feedback."}
+                    {"role": "user", "content": "Provide the detailed evaluation in valid JSON format."}
                 ],
-                temperature=0.7,
-                max_tokens=800
+                temperature=0.5,
+                max_tokens=1500
             )
-            return response.choices[0].message.content.strip()
+            
+            # Parse the JSON response
+            feedback_text = response.choices[0].message.content.strip()
+            
+            # Remove markdown code blocks if present
+            if feedback_text.startswith("```json"):
+                feedback_text = feedback_text[7:]
+            if feedback_text.startswith("```"):
+                feedback_text = feedback_text[3:]
+            if feedback_text.endswith("```"):
+                feedback_text = feedback_text[:-3]
+            
+            feedback_data = json.loads(feedback_text.strip())
+            
+            # Add metadata
+            feedback_data["date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            feedback_data["job_role"] = job_role
+            feedback_data["company"] = company if company else "General"
+            
+            # Save to history if candidate_id provided
+            if candidate_id:
+                self.history_manager.save_interview(candidate_id, feedback_data)
+            
+            return feedback_data
+            
+        except json.JSONDecodeError as e:
+            return {
+                "error": "Failed to parse feedback",
+                "details": str(e),
+                "raw_response": feedback_text if 'feedback_text' in locals() else "No response"
+            }
         except Exception as e:
-            return f"Error generating feedback: {str(e)}"
+            return {
+                "error": "Failed to generate feedback",
+                "details": str(e)
+            }
     
     def _generate_response(self, system_prompt: str, user_prompt: str) -> str:
         """Generate AI response using OpenAI"""
@@ -286,12 +500,93 @@ Interview Conversation:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.8,
-                max_tokens=300
+                temperature=0.7,
+                max_tokens=250,
+                stop=["candidate:", "Candidate:", "CANDIDATE:"]  # Stop generation if it tries to include candidate response
             )
-            return response.choices[0].message.content.strip()
+            
+            generated_text = response.choices[0].message.content.strip()
+            
+            # Additional safety check: remove any candidate responses that slipped through
+            if "candidate:" in generated_text.lower():
+                generated_text = generated_text.split("candidate:")[0].strip()
+                generated_text = generated_text.split("Candidate:")[0].strip()
+            
+            return generated_text
+            
         except Exception as e:
             return f"Error: {str(e)}"
+
+
+# ============================
+#  Visualization Functions
+# ============================
+
+def create_score_radar_chart(scores: Dict) -> go.Figure:
+    """Create a radar chart for scores"""
+    categories = []
+    values = []
+    
+    for category, data in scores.items():
+        categories.append(category.replace('_', ' ').title())
+        values.append(data['score'])
+    
+    fig = go.Figure(data=go.Scatterpolar(
+        r=values,
+        theta=categories,
+        fill='toself',
+        line=dict(color='rgb(67, 147, 195)'),
+        fillcolor='rgba(67, 147, 195, 0.5)'
+    ))
+    
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 10]
+            )
+        ),
+        showlegend=False,
+        title="Performance Radar Chart",
+        height=400
+    )
+    
+    return fig
+
+
+def create_comparison_chart(comparison: Dict) -> go.Figure:
+    """Create a comparison chart between interviews"""
+    categories = []
+    current_scores = []
+    previous_scores = []
+    
+    for category in comparison.get("improvements", {}).keys():
+        data = comparison["improvements"][category]
+        categories.append(category.replace('_', ' ').title())
+        current_scores.append(data["current"])
+        previous_scores.append(data["previous"])
+    
+    for category in comparison.get("declines", {}).keys():
+        data = comparison["declines"][category]
+        if category.replace('_', ' ').title() not in categories:
+            categories.append(category.replace('_', ' ').title())
+            current_scores.append(data["current"])
+            previous_scores.append(data["previous"])
+    
+    fig = go.Figure(data=[
+        go.Bar(name='Previous', x=categories, y=previous_scores, marker_color='lightblue'),
+        go.Bar(name='Current', x=categories, y=current_scores, marker_color='darkblue')
+    ])
+    
+    fig.update_layout(
+        title="Score Comparison with Previous Interview",
+        barmode='group',
+        yaxis=dict(range=[0, 10], title="Score"),
+        xaxis_title="Categories",
+        height=400
+    )
+    
+    return fig
 
 
 # ============================
@@ -300,12 +595,13 @@ Interview Conversation:
 
 def main():
     st.set_page_config(
-        page_title="AI Interview Prep",
+        page_title="AI Interview Prep Pro",
         page_icon="🎯",
         layout="wide"
     )
     
     st.title("🎯 AI-Powered Interview Preparation System")
+    st.markdown("### With Detailed Scoring & Progress Tracking")
     st.markdown("---")
     
     # Initialize session state
@@ -321,8 +617,12 @@ def main():
         st.session_state.conversation_history = []
     if "interview_active" not in st.session_state:
         st.session_state.interview_active = False
-    if "feedback" not in st.session_state:
-        st.session_state.feedback = None
+    if "feedback_data" not in st.session_state:
+        st.session_state.feedback_data = None
+    if "candidate_id" not in st.session_state:
+        st.session_state.candidate_id = ""
+    if "interview_ended_by_user" not in st.session_state:
+        st.session_state.interview_ended_by_user = False
     
     # Sidebar configuration
     with st.sidebar:
@@ -331,11 +631,19 @@ def main():
         # Display API status
         api_key = os.getenv("OPENAI_API_KEY")
         if api_key:
-            # Show masked API key for verification
             masked_key = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
-            st.success(f"✅ API Key Loaded: `{masked_key}`")
+            st.success(f"✅ API Key: `{masked_key}`")
         else:
             st.error("❌ API Key Not Found")
+        
+        st.markdown("---")
+        
+        # Candidate ID for tracking
+        st.session_state.candidate_id = st.text_input(
+            "Candidate ID (for tracking progress)",
+            value=st.session_state.candidate_id,
+            help="Use same ID to track your improvement over multiple interviews"
+        )
         
         st.markdown("---")
         
@@ -354,7 +662,6 @@ def main():
                 kb.get_available_companies()
             )
             
-            # Show company info
             if company:
                 with st.expander(f"ℹ️ About {company}"):
                     context = kb.get_company_context(company)
@@ -377,13 +684,13 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("▶️ Start Interview", use_container_width=True, 
+            if st.button("▶️ Start", use_container_width=True, 
                         disabled=st.session_state.interview_active):
                 st.session_state.interview_active = True
                 st.session_state.conversation_history = []
-                st.session_state.feedback = None
+                st.session_state.feedback_data = None
+                st.session_state.interview_ended_by_user = False
                 
-                # Get initial question
                 intro = st.session_state.interviewer.initialize_interview(
                     job_role, difficulty, company
                 )
@@ -394,62 +701,75 @@ def main():
                 st.rerun()
         
         with col2:
-            if st.button("⏹️ End Interview", use_container_width=True,
+            if st.button("⏹️ End", use_container_width=True,
                         disabled=not st.session_state.interview_active):
                 st.session_state.interview_active = False
+                st.session_state.interview_ended_by_user = True
                 
-                # Generate feedback if conversation exists
                 if len(st.session_state.conversation_history) > 2:
-                    with st.spinner("Generating feedback..."):
-                        feedback = st.session_state.interviewer.generate_feedback(
+                    with st.spinner("Generating detailed feedback..."):
+                        feedback = st.session_state.interviewer.generate_detailed_feedback(
                             st.session_state.conversation_history,
                             job_role,
-                            company
+                            company,
+                            st.session_state.candidate_id if st.session_state.candidate_id else None
                         )
-                        st.session_state.feedback = feedback
+                        st.session_state.feedback_data = feedback
                 st.rerun()
         
-        # Reset button
         if st.button("🔄 Reset", use_container_width=True):
             st.session_state.conversation_history = []
             st.session_state.interview_active = False
-            st.session_state.feedback = None
+            st.session_state.feedback_data = None
+            st.session_state.interview_ended_by_user = False
             st.rerun()
+        
+        # Show previous interview stats
+        if st.session_state.candidate_id:
+            st.markdown("---")
+            st.subheader("📊 Your History")
+            history = st.session_state.interviewer.history_manager.get_candidate_history(
+                st.session_state.candidate_id
+            )
+            if history:
+                st.metric("Total Interviews", len(history))
+                latest = history[-1]
+                st.metric("Last Score", f"{latest.get('overall_score', 'N/A')}/10")
+            else:
+                st.info("No previous interviews found")
     
     # Main content area
     if not st.session_state.interview_active and not st.session_state.conversation_history:
         # Welcome screen
-        st.info("👈 Configure your interview settings in the sidebar and click **Start Interview** to begin!")
+        st.info("👈 Configure your interview settings and click **Start** to begin!")
         
         col1, col2 = st.columns(2)
         
         with col1:
             st.subheader("🏢 Company-Specific Interviews")
             st.write("""
-            Prepare for interviews at top tech companies:
             - Google, Amazon, Microsoft, Meta, Apple
-            - Company-specific questions and culture
-            - Tailored feedback based on company values
+            - Company-specific questions
+            - Tailored cultural fit assessment
             """)
         
         with col2:
             st.subheader("📝 General Interviews")
             st.write("""
-            General technical interview practice:
             - Industry-standard questions
             - Comprehensive skill assessment
-            - Applicable to any company
+            - Universal best practices
             """)
         
-        # Quick start tips
-        with st.expander("💡 Quick Start Tips"):
+        with st.expander("💡 Features"):
             st.write("""
-            1. Select your target company or choose "General Interview"
-            2. Enter your desired job role (e.g., "Software Engineer", "Data Scientist")
-            3. Choose difficulty level based on your experience
-            4. Click "Start Interview" to begin
-            5. Respond naturally to the AI interviewer's questions
-            6. Click "End Interview" when done to receive feedback
+            ✅ **Detailed Scoring**: Get scored on 6 different categories
+            ✅ **Progress Tracking**: Compare your improvement over time
+            ✅ **Actionable Feedback**: Specific recommendations for improvement
+            ✅ **Company-Specific**: Tailored questions for top tech companies
+            ✅ **History Tracking**: Track all your interview attempts
+            ✅ **Interactive Experience**: Natural conversation flow with follow-up questions
+            ✅ **User-Controlled Ending**: Just say you want to end the interview
             """)
     
     else:
@@ -469,16 +789,17 @@ def main():
         
         # Input area
         if st.session_state.interview_active:
+            # Add a hint about ending the interview
+            st.caption("💡 You can say 'I'd like to end the interview' at any time to conclude")
+            
             user_input = st.chat_input("Type your response here...")
             
             if user_input:
-                # Add user response
                 st.session_state.conversation_history.append({
                     "role": "candidate",
                     "content": user_input
                 })
                 
-                # Generate next question
                 with st.spinner("Thinking..."):
                     next_question = st.session_state.interviewer.generate_next_question(
                         st.session_state.conversation_history,
@@ -494,33 +815,193 @@ def main():
                 
                 st.rerun()
         
-        # Display feedback if available
-        if st.session_state.feedback:
+        # Display detailed feedback
+        if st.session_state.feedback_data and not st.session_state.interview_active:
             st.markdown("---")
-            st.subheader("📊 Interview Feedback")
-            st.markdown(st.session_state.feedback)
+            st.header("📊 Detailed Interview Feedback")
             
-            # Download option
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                if st.download_button(
-                    label="📥 Download Feedback",
-                    data=st.session_state.feedback,
-                    file_name=f"interview_feedback_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                    mime="text/plain",
-                    use_container_width=True
-                ):
-                    st.success("Feedback downloaded!")
+            feedback = st.session_state.feedback_data
             
-            # Tips for improvement
-            with st.expander("🔍 Tips for Improvement"):
-                st.write("""
-                - **Review your answers**: Identify areas where you could have been more specific
-                - **Practice STAR method**: For behavioral questions, use Situation, Task, Action, Result
-                - **Technical depth**: Make sure to explain your thinking process for technical questions
-                - **Ask questions**: Remember that interviews are a two-way conversation
-                - **Record yourself**: Consider recording practice sessions to improve communication skills
-                """)
+            # Check for errors
+            if "error" in feedback:
+                st.error(f"Error: {feedback['error']}")
+                st.info(f"Details: {feedback.get('details', 'Unknown error')}")
+                if "raw_response" in feedback:
+                    with st.expander("Raw Response (for debugging)"):
+                        st.code(feedback["raw_response"])
+            else:
+                # Overall summary
+                st.subheader("📋 Overall Summary")
+                st.write(feedback.get("overall_summary", "No summary available"))
+                
+                # Overall score with progress bar
+                overall_score = feedback.get("overall_score", 0)
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.metric("Overall Score", f"{overall_score}/10")
+                    st.progress(overall_score / 10)
+                with col2:
+                    recommendation = feedback.get("recommendation", "N/A")
+                    recommendation_emoji = {
+                        "hire": "✅",
+                        "maybe": "⚠️",
+                        "no_hire": "❌"
+                    }
+                    st.metric("Recommendation", 
+                             f"{recommendation_emoji.get(recommendation, '❓')} {recommendation.replace('_', ' ').title()}")
+                with col3:
+                    st.metric("Date", feedback.get("date", "N/A").split()[0])
+                
+                st.markdown("---")
+                
+                # Detailed scores
+                col1, col2 = st.columns([1, 1])
+                
+                with col1:
+                    st.subheader("📈 Score Breakdown")
+                    scores = feedback.get("scores", {})
+                    
+                    for category, data in scores.items():
+                        with st.expander(f"**{category.replace('_', ' ').title()}** - {data['score']}/10"):
+                            st.progress(data['score'] / 10)
+                            
+                            st.write("**Strengths:**")
+                            for strength in data.get('strengths', []):
+                                st.write(f"✅ {strength}")
+                            
+                            st.write("**Weaknesses:**")
+                            for weakness in data.get('weaknesses', []):
+                                st.write(f"❌ {weakness}")
+                            
+                            st.write("**Details:**")
+                            st.write(data.get('details', 'No details available'))
+                
+                with col2:
+                    st.subheader("📊 Visual Performance")
+                    if scores:
+                        fig = create_score_radar_chart(scores)
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("---")
+                
+                # Key highlights and improvements
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("🌟 Key Highlights")
+                    for highlight in feedback.get("key_highlights", []):
+                        st.success(f"✨ {highlight}")
+                
+                with col2:
+                    st.subheader("📈 Areas for Improvement")
+                    for area in feedback.get("improvement_areas", []):
+                        st.warning(f"⚠️ {area}")
+                
+                st.markdown("---")
+                
+                # Actionable recommendations
+                st.subheader("💡 Actionable Recommendations")
+                for i, rec in enumerate(feedback.get("actionable_recommendations", []), 1):
+                    st.info(f"**{i}.** {rec}")
+                
+                # Comparison with previous interview
+                if st.session_state.candidate_id:
+                    comparison = st.session_state.interviewer.history_manager.compare_interviews(
+                        st.session_state.candidate_id
+                    )
+                    
+                    if comparison:
+                        st.markdown("---")
+                        st.subheader("📊 Progress Comparison")
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Improved Areas", len(comparison.get("improvements", {})))
+                        with col2:
+                            st.metric("Declined Areas", len(comparison.get("declines", {})))
+                        with col3:
+                            avg_improvement = sum(
+                                d["change"] for d in comparison.get("improvements", {}).values()
+                            ) / max(len(comparison.get("improvements", {})), 1)
+                            st.metric("Avg Improvement", f"{avg_improvement:+.1f}")
+                        
+                        fig_comparison = create_comparison_chart(comparison)
+                        st.plotly_chart(fig_comparison, use_container_width=True)
+                        
+                        with st.expander("📝 Detailed Comparison"):
+                            if comparison.get("improvements"):
+                                st.write("**Improvements:**")
+                                for category, data in comparison["improvements"].items():
+                                    st.write(f"✅ {category.replace('_', ' ').title()}: "
+                                           f"{data['previous']} → {data['current']} "
+                                           f"(+{data['change']})")
+                            
+                            if comparison.get("declines"):
+                                st.write("**Declines:**")
+                                for category, data in comparison["declines"].items():
+                                    st.write(f"❌ {category.replace('_', ' ').title()}: "
+                                           f"{data['previous']} → {data['current']} "
+                                           f"({data['change']})")
+                
+                # Download options
+                st.markdown("---")
+                col1, col2 = st.columns([1, 3])
+                
+                with col1:
+                    # Download JSON
+                    json_data = json.dumps(feedback, indent=2)
+                    st.download_button(
+                        label="📥 Download JSON",
+                        data=json_data,
+                        file_name=f"interview_feedback_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                        mime="application/json",
+                        use_container_width=True
+                    )
+                
+                with col2:
+                    # Download formatted report
+                    report = f"""
+INTERVIEW FEEDBACK REPORT
+{'=' * 50}
+
+Date: {feedback.get('date', 'N/A')}
+Job Role: {feedback.get('job_role', 'N/A')}
+Company: {feedback.get('company', 'N/A')}
+Overall Score: {feedback.get('overall_score', 'N/A')}/10
+Recommendation: {feedback.get('recommendation', 'N/A').replace('_', ' ').title()}
+
+OVERALL SUMMARY
+{'-' * 50}
+{feedback.get('overall_summary', 'No summary available')}
+
+SCORE BREAKDOWN
+{'-' * 50}
+"""
+                    for category, data in feedback.get('scores', {}).items():
+                        report += f"\n{category.replace('_', ' ').title()}: {data['score']}/10\n"
+                        report += f"Strengths: {', '.join(data.get('strengths', []))}\n"
+                        report += f"Weaknesses: {', '.join(data.get('weaknesses', []))}\n"
+                        report += f"Details: {data.get('details', 'N/A')}\n"
+                    
+                    report += f"\nKEY HIGHLIGHTS\n{'-' * 50}\n"
+                    for highlight in feedback.get('key_highlights', []):
+                        report += f"- {highlight}\n"
+                    
+                    report += f"\nAREAS FOR IMPROVEMENT\n{'-' * 50}\n"
+                    for area in feedback.get('improvement_areas', []):
+                        report += f"- {area}\n"
+                    
+                    report += f"\nACTIONABLE RECOMMENDATIONS\n{'-' * 50}\n"
+                    for i, rec in enumerate(feedback.get('actionable_recommendations', []), 1):
+                        report += f"{i}. {rec}\n"
+                    
+                    st.download_button(
+                        label="📄 Download Report",
+                        data=report,
+                        file_name=f"interview_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
 
 
 if __name__ == "__main__":
